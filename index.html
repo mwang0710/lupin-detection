@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<!-- saved from url=(0054)file:///Users/minwang/Downloads/lupin_detection_2.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lupin Detection — POC</title>
+
+<link rel="stylesheet" href="./index_files/leaflet.min.css">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-bg:            #ffffff;
+      --color-bg-secondary:  #f5f5f3;
+      --color-text:          #1a1a18;
+      --color-text-secondary:#6b6b67;
+      --color-text-tertiary: #a0a09b;
+      --color-border:        rgba(0,0,0,0.12);
+      --color-border-md:     rgba(0,0,0,0.22);
+      --radius-md:           8px;
+      --radius-lg:           12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-bg:            #1c1c1a;
+        --color-bg-secondary:  #272724;
+        --color-text:          #f0efea;
+        --color-text-secondary:#9a9a94;
+        --color-text-tertiary: #5a5a56;
+        --color-border:        rgba(255,255,255,0.10);
+        --color-border-md:     rgba(255,255,255,0.18);
+      }
+    }
+
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--color-bg); color: var(--color-text); }
+
+    #app {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      height: 100vh;
+      border: 0.5px solid var(--color-border);
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      border-right: 0.5px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--color-bg);
+    }
+
+    #sidebar-header {
+      padding: 11px 14px;
+      border-bottom: 0.5px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #sidebar-header h1 {
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot-live {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #3B6D11;
+      display: inline-block;
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+    .lang-toggle {
+      display: flex;
+      border: 0.5px solid var(--color-border-md);
+      border-radius: 6px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .lang-btn { padding: 3px 8px; font-size: 11px; font-weight: 500; border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+    .lang-btn.active { background: var(--color-text); color: var(--color-bg); }
+
+    #sidebar-body { padding: 12px 14px; flex: 1; overflow-y: auto; }
+
+    .section-label {
+      font-size: 10px; font-weight: 500; letter-spacing: 0.07em;
+      text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 6px;
+    }
+
+    .token-box {
+      background: var(--color-bg-secondary); border-radius: var(--radius-md);
+      padding: 9px 11px; font-size: 11px; color: var(--color-text-secondary);
+      margin-bottom: 10px; line-height: 1.5;
+    }
+    .token-box a { color: #185FA5; }
+    .token-box strong { font-size: 11px; display: block; margin-bottom: 3px; color: var(--color-text); }
+
+    input[type=text], input[type=date] {
+      width: 100%; padding: 5px 8px; font-size: 11px;
+      border: 0.5px solid var(--color-border-md); border-radius: var(--radius-md);
+      background: var(--color-bg-secondary); color: var(--color-text); outline: none;
+    }
+    input[type=text]:focus, input[type=date]:focus { border-color: #185FA5; box-shadow: 0 0 0 2px rgba(24,95,165,0.15); }
+
+    .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 11px; }
+    .date-field label { font-size: 10px; color: var(--color-text-secondary); display: block; margin-bottom: 3px; }
+
+    .threshold-row { margin-bottom: 11px; }
+    .threshold-row .row-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .threshold-row label { font-size: 11px; color: var(--color-text-secondary); }
+    .threshold-row .val  { font-size: 11px; font-weight: 500; }
+    input[type=range] { width: 100%; accent-color: var(--color-text); }
+
+    /* ── Draw tools ── */
+    .draw-tools { display: flex; gap: 5px; margin-bottom: 9px; }
+
+    .tool-btn {
+      flex: 1; padding: 7px 0; font-size: 11px; font-weight: 500;
+      border-radius: var(--radius-md); border: 0.5px solid var(--color-border-md);
+      background: transparent; color: var(--color-text-secondary); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .tool-btn:hover { background: var(--color-bg-secondary); }
+    .tool-btn.active { background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+
+    .draw-hint {
+      font-size: 11px; color: var(--color-text-secondary);
+      background: var(--color-bg-secondary); border-radius: var(--radius-md);
+      padding: 7px 10px; margin-bottom: 10px; line-height: 1.5; min-height: 34px;
+    }
+
+    .polygon-info { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 10px; display: none; }
+    .polygon-info .val { font-weight: 500; color: var(--color-text); }
+
+    .btn-primary {
+      width: 100%; padding: 8px 0; font-size: 12px; font-weight: 500;
+      border-radius: var(--radius-md); border: 0.5px solid var(--color-border-md);
+      background: var(--color-text); color: var(--color-bg); cursor: pointer; margin-bottom: 6px;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-secondary {
+      width: 100%; padding: 6px 0; font-size: 11px;
+      border-radius: var(--radius-md); border: 0.5px solid var(--color-border);
+      background: transparent; color: var(--color-text); cursor: pointer; margin-bottom: 11px;
+    }
+    .btn-secondary:hover { background: var(--color-bg-secondary); }
+
+    #result-panel { border-top: 0.5px solid var(--color-border); padding: 10px 14px; }
+    .result-status { display: flex; align-items: center; gap: 8px; }
+    .status-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+    .status-icon.detected { background: #FAECE7; color: #993C1D; }
+    .status-icon.clean    { background: #EAF3DE; color: #3B6D11; }
+    .status-icon.idle     { background: var(--color-bg-secondary); color: var(--color-text-tertiary); }
+
+    .result-title { font-weight: 500; font-size: 12px; }
+    .result-sub   { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+
+    .coverage-bar { margin-top: 8px; height: 3px; background: var(--color-bg-secondary); border-radius: 2px; overflow: hidden; }
+    .coverage-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
+    .coverage-fill.high { background: #D85A30; }
+    .coverage-fill.low  { background: #639922; }
+    .coverage-label { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--color-text-secondary); }
+
+    .gbif-yr-btn {
+      padding: 2px 6px; font-size: 10px; font-weight: 500;
+      border-radius: 4px; border: 0.5px solid var(--color-border-md);
+      background: transparent; color: var(--color-text-secondary);
+      cursor: pointer; transition: all .12s;
+    }
+    .gbif-yr-btn:hover { background: var(--color-bg-secondary); }
+    .gbif-yr-btn.active { background: #E87D14; color: #fff; border-color: #E87D14; }
+
+    .year-btn-main {
+      padding: 3px 7px; font-size: 11px; font-weight: 500;
+      border-radius: 5px; border: 0.5px solid var(--color-border-md);
+      background: transparent; color: var(--color-text-secondary);
+      cursor: pointer; transition: all .12s;
+    }
+    .year-btn-main:hover { background: var(--color-bg-secondary); }
+    .year-btn-main.active { background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+
+    /* ── Map ── */
+    #map-container { position: relative; height: 100vh; overflow: hidden; }
+    #map { width: 100%; height: 100%; }
+
+    #map-overlay {
+      position: absolute; top: 10px; left: 10px;
+      background: var(--color-bg); border: 0.5px solid var(--color-border);
+      border-radius: var(--radius-md); padding: 6px 10px;
+      font-size: 11px; color: var(--color-text-secondary);
+      pointer-events: none; z-index: 10; max-width: 200px;
+    }
+    #map-overlay strong { display: block; font-weight: 500; font-size: 12px; margin-bottom: 1px; }
+
+    #baselayer-switcher {
+      position: absolute; bottom: 30px; left: 10px; z-index: 1001;
+      display: flex; gap: 3px; background: var(--color-bg);
+      border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 4px;
+      pointer-events: all;
+    }
+    #layer-switcher {
+      position: absolute; top: 10px; right: 10px; z-index: 1001;
+      display: flex; gap: 3px; background: var(--color-bg);
+      border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 4px;
+      pointer-events: all;
+    }
+    .bl-btn, .al-btn {
+      padding: 4px 8px; font-size: 11px; font-weight: 500; border-radius: 5px;
+      border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; white-space: nowrap;
+      pointer-events: all;
+    }
+    .bl-btn.active, .al-btn.active { background: var(--color-text); color: var(--color-bg); }
+
+    #map-legend {
+      position: absolute; top: 46px; right: 10px; z-index: 1001;
+      background: var(--color-bg); border: 0.5px solid var(--color-border);
+      border-radius: var(--radius-md); padding: 8px 11px;
+      font-size: 11px; color: var(--color-text-secondary);
+      min-width: 130px; pointer-events: none;
+    }
+    .legend-title {
+      font-size: 10px; font-weight: 500; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--color-text-tertiary);
+      margin-bottom: 6px;
+    }
+    .legend-row {
+      display: flex; align-items: center; gap: 7px; margin-bottom: 4px;
+    }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-swatch {
+      width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+      border: 0.5px solid rgba(0,0,0,0.12);
+    }
+    .legend-gradient {
+      width: 100%; height: 10px; border-radius: 3px; margin-bottom: 4px;
+      border: 0.5px solid rgba(0,0,0,0.10);
+    }
+    .legend-grad-labels {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--color-text-tertiary); margin-bottom: 4px;
+    }
+    .loading-ring {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid var(--color-border); border-top-color: var(--color-text);
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin: 5px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1><span class="dot-live"></span><span data-t="appTitle">Lupin Detection — POC</span></h1>
+      <div class="lang-toggle">
+        <button class="lang-btn active" onclick="setLang(&#39;en&#39;)">EN</button>
+        <button class="lang-btn" onclick="setLang(&#39;sv&#39;)">SV</button>
+      </div>
+    </div>
+
+    <div id="sidebar-body">
+
+      <div class="token-box">
+        <strong data-t="shTitle">Sentinel Hub token</strong>
+        <span data-t="shDesc">Free trial at&nbsp;</span>
+        <a href="https://www.sentinel-hub.com/" target="_blank">sentinel-hub.com</a>
+        <div style="margin-top:6px;position:relative">
+          <input type="text" id="sh-token" placeholder="eyJhbGci…" autocomplete="off" oninput="onShTokenChange()">
+          <span id="sh-token-status" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;pointer-events:none"></span>
+        </div>
+      </div>
+
+      <!-- Draw tools -->
+      <div class="section-label" data-t="drawLabel">Draw area</div>
+      <div class="draw-tools">
+        <button class="tool-btn" id="tool-polygon" onclick="activateTool(&#39;polygon&#39;)">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <polygon points="6.5,1 12,4.5 10,11 3,11 1,4.5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"></polygon>
+          </svg>
+          <span data-t="toolPolygon">Polygon</span>
+        </button>
+        <button class="tool-btn" id="tool-rect" onclick="activateTool(&#39;rect&#39;)">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="1" y="3" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"></rect>
+          </svg>
+          <span data-t="toolRect">Rectangle</span>
+        </button>
+        <button class="tool-btn" id="tool-clear" onclick="clearDrawing()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <line x1="2" y1="2" x2="11" y2="11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></line>
+            <line x1="11" y1="2" x2="2" y2="11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></line>
+          </svg>
+          <span data-t="toolClear">Clear</span>
+        </button>
+      </div>
+
+      <div class="draw-hint" id="draw-hint" data-t="hintIdle">Choose Polygon or Rectangle, then draw on the map.</div>
+
+      <div class="polygon-info" id="polygon-info">
+        <span data-t="areaLabel">Area</span> <span class="val" id="area-val">—</span>
+      </div>
+
+      <div style="margin-bottom:11px">
+        <div class="section-label" data-t="periodLabel">Analysis period</div>
+        <!-- Year picker -->
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px" id="year-btns-main"><button class="year-btn-main">2019</button><button class="year-btn-main">2020</button><button class="year-btn-main">2021</button><button class="year-btn-main">2022</button><button class="year-btn-main">2023</button><button class="year-btn-main active">2024</button><button class="year-btn-main">2025</button></div>
+        <div class="date-grid">
+          <div class="date-field"><label data-t="preStart">Pre-bloom start</label><input type="date" id="pre-start" value="2024-05-01"></div>
+          <div class="date-field"><label data-t="splitDate">Split date</label><input type="date" id="split-date" value="2024-06-15"></div>
+          <div class="date-field"><label data-t="peakStart">Peak-bloom start</label><input type="date" id="peak-start" value="2024-06-15"></div>
+          <div class="date-field"><label data-t="peakEnd">Peak-bloom end</label><input type="date" id="peak-end" value="2024-07-15"></div>
+        </div>
+      </div>
+
+      <div class="threshold-row">
+        <div class="row-top"><label data-t="dndviLabel">ΔNDVI threshold (phenology)</label><span class="val" id="dndvi-val">−0.03</span></div>
+        <input type="range" min="-0.20" max="0" step="0.01" value="-0.03" id="dndvi-thresh" oninput="document.getElementById(&#39;dndvi-val&#39;).textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+
+      <div class="threshold-row">
+        <div class="row-top"><label data-t="nbgdLabel">NBGD threshold (purple colour)</label><span class="val" id="nbgd-val">−0.15</span></div>
+        <input type="range" min="-0.30" max="0.10" step="0.01" value="-0.15" id="nbgd-thresh" oninput="document.getElementById(&#39;nbgd-val&#39;).textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+
+      <hr class="divider">
+
+      <button class="btn-primary" id="btn-analyze" onclick="runAnalysis()" disabled="">
+        <span data-t="btnAnalyze">Analyse drawn area</span>
+      </button>
+      <div style="font-size:10px;color:var(--color-text-tertiary);text-align:center;margin-bottom:4px" data-t="nvdbNote">Road buffer (NVDB ±30 m) applied automatically</div>
+      <button class="btn-secondary" onclick="resetAll()">
+        <span data-t="btnReset">Reset</span>
+      </button>
+      <div id="loading" class="loading-ring"></div>
+
+    </div>
+
+    <div id="result-panel">
+      <div class="result-status">
+        <div class="status-icon idle" id="status-icon">?</div>
+        <div>
+          <div class="result-title" id="result-title" data-t="idleTitle">Draw an area on the map</div>
+          <div class="result-sub" id="result-sub" data-t="idleSub">Use the tools above</div>
+        </div>
+      </div>
+      <div id="coverage-block" style="display:none">
+        <div class="coverage-bar"><div class="coverage-fill" id="coverage-fill" style="width:0%"></div></div>
+        <div class="coverage-label">
+          <span data-t="coverageLabel">Lupin coverage</span>
+          <span id="coverage-pct">—</span>
+        </div>
+      </div>
+    </div>
+    <!-- GBIF citation -->
+    <div style="padding:6px 14px;border-top:0.5px solid var(--color-border);font-size:9px;color:var(--color-text-tertiary);line-height:1.5">
+      <strong style="display:block;margin-bottom:1px;color:var(--color-text-secondary)">Data source</strong>
+      SLU Swedish Species Information Centre, Liljeblad J (2026). Artportalen. Version 92.468.
+      <a href="https://www.gbif.se/ipt/resource?r=artdata&amp;v=92.468" target="_blank" style="color:#185FA5">gbif.se</a>
+    </div>
+  </div><!-- end #sidebar -->
+
+  <div id="map-container">
+    <div id="map" class="leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" tabindex="0" style="position: relative;"><div class="leaflet-pane leaflet-map-pane" style="transform: translate3d(0px, 0px, 0px);"><div class="leaflet-pane leaflet-tile-pane"><div class="leaflet-layer " style="z-index: 1; opacity: 1;"><div class="leaflet-tile-container leaflet-zoom-animated" style="z-index: 18; transform: translate3d(0px, 0px, 0px) scale(1);"><img alt="" src="./index_files/292.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(457px, 229px, 0px); opacity: 1;"><img alt="" src="./index_files/293.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(457px, 485px, 0px); opacity: 1;"><img alt="" src="./index_files/292(1).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(201px, 229px, 0px); opacity: 1;"><img alt="" src="./index_files/292(2).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(713px, 229px, 0px); opacity: 1;"><img alt="" src="./index_files/293(1).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(201px, 485px, 0px); opacity: 1;"><img alt="" src="./index_files/293(2).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(713px, 485px, 0px); opacity: 1;"><img alt="" src="./index_files/291.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(457px, -27px, 0px); opacity: 1;"><img alt="" src="./index_files/294.png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(457px, 741px, 0px); opacity: 1;"><img alt="" src="./index_files/291(1).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(201px, -27px, 0px); opacity: 1;"><img alt="" src="./index_files/291(2).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(713px, -27px, 0px); opacity: 1;"><img alt="" src="./index_files/294(1).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(201px, 741px, 0px); opacity: 1;"><img alt="" src="./index_files/294(2).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(713px, 741px, 0px); opacity: 1;"><img alt="" src="./index_files/292(3).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-55px, 229px, 0px); opacity: 1;"><img alt="" src="./index_files/292(4).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(969px, 229px, 0px); opacity: 1;"><img alt="" src="./index_files/293(3).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-55px, 485px, 0px); opacity: 1;"><img alt="" src="./index_files/293(4).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(969px, 485px, 0px); opacity: 1;"><img alt="" src="./index_files/291(3).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-55px, -27px, 0px); opacity: 1;"><img alt="" src="./index_files/291(4).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(969px, -27px, 0px); opacity: 1;"><img alt="" src="./index_files/294(3).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(-55px, 741px, 0px); opacity: 1;"><img alt="" src="./index_files/294(4).png" class="leaflet-tile leaflet-tile-loaded" style="width: 256px; height: 256px; transform: translate3d(969px, 741px, 0px); opacity: 1;"></div></div></div><div class="leaflet-pane leaflet-overlay-pane"></div><div class="leaflet-pane leaflet-shadow-pane"></div><div class="leaflet-pane leaflet-marker-pane"></div><div class="leaflet-pane leaflet-tooltip-pane"></div><div class="leaflet-pane leaflet-popup-pane"></div><div class="leaflet-proxy leaflet-zoom-animated"></div></div><div class="leaflet-control-container"><div class="leaflet-top leaflet-left"><div class="leaflet-control-zoom leaflet-bar leaflet-control"><a class="leaflet-control-zoom-in" href="file:///Users/minwang/Downloads/lupin_detection_2.html#" title="Zoom in" role="button" aria-label="Zoom in" aria-disabled="false"><span aria-hidden="true">+</span></a><a class="leaflet-control-zoom-out" href="file:///Users/minwang/Downloads/lupin_detection_2.html#" title="Zoom out" role="button" aria-label="Zoom out" aria-disabled="false"><span aria-hidden="true">−</span></a></div></div><div class="leaflet-top leaflet-right"></div><div class="leaflet-bottom leaflet-left"></div><div class="leaflet-bottom leaflet-right"><div class="leaflet-control-attribution leaflet-control"><a href="https://leafletjs.com/" title="A JavaScript library for interactive maps"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" class="leaflet-attribution-flag"><path fill="#4C7BE1" d="M0 0h12v4H0z"></path><path fill="#FFD500" d="M0 4h12v3H0z"></path><path fill="#E0BC00" d="M0 7h12v1H0z"></path></svg> Leaflet</a> <span aria-hidden="true">|</span> © OpenStreetMap</div></div></div></div>
+    <div id="map-overlay">
+      <strong id="overlay-title" data-t="overlayTitle">Draw on the map</strong>
+      <span id="overlay-coords" data-t="overlaySubtitle">Select a tool to start</span>
+    </div>
+    <div id="baselayer-switcher">
+      <button class="bl-btn active" id="bl-osm" onclick="setBaselayer(&#39;osm&#39;)">OSM</button>
+      <button class="bl-btn" id="bl-streets" onclick="setBaselayer(&#39;streets&#39;)">Streets</button>
+      <button class="bl-btn" id="bl-satellite" onclick="setBaselayer(&#39;satellite&#39;)">Satellite</button>
+    </div>
+    <div id="layer-switcher">
+      <button class="al-btn active" id="al-rgb" onclick="switchAnalysisLayer(&#39;rgb&#39;)">RGB</button>
+      <button class="al-btn" id="al-nbgd" onclick="switchAnalysisLayer(&#39;nbgd&#39;)">NBGD</button>
+      <button class="al-btn" id="al-ndvi" onclick="switchAnalysisLayer(&#39;ndvi&#39;)">NDVI</button>
+      <button class="al-btn" id="al-lupin" onclick="switchAnalysisLayer(&#39;lupin&#39;)">Lupin</button>
+      <div style="width:0.5px;background:var(--color-border);margin:0 2px;align-self:stretch"></div>
+      <button class="al-btn" id="bl-gbif" onclick="toggleGBIF()" title="Known lupin (GBIF)">GBIF</button>
+    </div>
+
+    <div id="map-legend" style="display:none"></div>
+    <div id="gbif-year-filter" style="display:none;position:absolute;top:10px;left:10px;z-index:1001;background:var(--color-bg);border:0.5px solid var(--color-border);border-radius:var(--radius-md);padding:7px 10px;pointer-events:all">
+      <div style="font-size:10px;color:var(--color-text-tertiary);margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase">GBIF year filter</div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px" id="gbif-year-btns"><button class="gbif-yr-btn" data-year="2019" style="--yr-color: #8B5E3C;">2019</button><button class="gbif-yr-btn" data-year="2020" style="--yr-color: #6B7280;">2020</button><button class="gbif-yr-btn" data-year="2021" style="--yr-color: #0ea5e9;">2021</button><button class="gbif-yr-btn" data-year="2022" style="--yr-color: #8b5cf6;">2022</button><button class="gbif-yr-btn" data-year="2023" style="--yr-color: #10b981;">2023</button><button class="gbif-yr-btn" data-year="2024" style="--yr-color: #f59e0b;">2024</button><button class="gbif-yr-btn" data-year="2025" style="--yr-color: #ef4444;">2025</button><button class="gbif-yr-btn" style="font-style: italic;">All</button></div>
+      <div style="font-size:9px;color:var(--color-text-tertiary)">All years shown if none selected</div>
+    </div>
+    <div id="img-date-label" style="display:none;position:absolute;bottom:46px;right:10px;z-index:1001;background:var(--color-bg);border:0.5px solid var(--color-border);border-radius:var(--radius-md);padding:4px 9px;font-size:10px;color:var(--color-text-secondary);pointer-events:none"></div>
+  </div>
+</div>
+
+<script src="./index_files/leaflet.min.js"></script>
+<script src="./index_files/turf.min.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  i18n
+// ════════════════════════════════════════════════════════════
+const STRINGS = {
+  en: {
+    appTitle:'Lupin Detection — POC',
+shTitle:'Sentinel Hub token', shDesc:'Free trial at\u00a0',
+    drawLabel:'Draw area',
+    toolPolygon:'Polygon', toolRect:'Rectangle', toolClear:'Clear',
+    hintIdle:'Choose Polygon or Rectangle, then draw on the map.',
+    hintPolygon:'Click to add vertices. Double-click to finish.',
+    hintRect:'Click and drag to draw a rectangle.',
+    hintDone:'Area ready. Click \u201cAnalyse\u201d to run detection.',
+    areaLabel:'Area', resLabel:'Resolution',
+    periodLabel:'Analysis period',
+    preStart:'Pre-bloom start', splitDate:'Split date',
+    peakStart:'Peak-bloom start', peakEnd:'Peak-bloom end',
+    dndviLabel:'ΔNDVI threshold (phenology)',
+    nbgdLabel:'NBGD threshold (purple colour)',
+    btnAnalyze:'Analyse drawn area', btnReset:'Reset',
+    nvdbNote:'Road buffer (NVDB ±30 m) applied automatically',
+    idleTitle:'Draw an area on the map', idleSub:'Use the tools above',
+    coverageLabel:'Lupin coverage',
+    overlayTitle:'Draw on the map', overlaySubtitle:'Select a tool to start',
+    overlayReady:'Area ready', overlayAnalysing:'Analysing\u2026',
+    analyzingTitle:'Analysing\u2026', analyzingSub:'Processing drawn area',
+    detectedTitle:'Lupin detected', cleanTitle:'No lupin detected',
+    simSub:'No SH token — add token for real Sentinel-2 data',
+    liveSub:'Sentinel-2 L2A analysis complete',
+    readyTitle:'Area drawn', readySub:'Click \u201cAnalyse\u201d to run detection',
+    noArea:'Draw an area on the map first.',
+  },
+  sv: {
+    appTitle:'Lupin-detektion \u2014 POC',
+    shTitle:'Sentinel Hub-token', shDesc:'Gratis trial p\u00e5\u00a0',
+    drawLabel:'Rita omr\u00e5de',
+    toolPolygon:'Polygon', toolRect:'Rektangel', toolClear:'Rensa',
+    hintIdle:'V\u00e4lj Polygon eller Rektangel och rita p\u00e5 kartan.',
+    hintPolygon:'Klicka f\u00f6r att l\u00e4gga till h\u00f6rnpunkter. Dubbelklicka f\u00f6r att avsluta.',
+    hintRect:'Klicka och dra f\u00f6r att rita en rektangel.',
+    hintDone:'Omr\u00e5de klart. Klicka p\u00e5 \u201dAnalysera\u201d f\u00f6r att k\u00f6ra detektion.',
+    areaLabel:'Yta', resLabel:'Upplösning',
+    periodLabel:'Analysperiod',
+    preStart:'F\u00f6r-blomning start', splitDate:'Delningsdatum',
+    peakStart:'Topp-blomning start', peakEnd:'Topp-blomning slut',
+    dndviLabel:'\u0394NDVI-tr\u00f6skel (fenologi)',
+    nbgdLabel:'NBGD-tr\u00f6skel (lila f\u00e4rg)',
+    btnAnalyze:'Analysera ritat omr\u00e5de', btnReset:'\u00c5terst\u00e4ll',
+    nvdbNote:'V\u00e4gbuffert (NVDB \u00b130 m) appliceras automatiskt',
+    idleTitle:'Rita ett omr\u00e5de p\u00e5 kartan', idleSub:'Anv\u00e4nd verktygen ovan',
+    coverageLabel:'Lupin-t\u00e4ckning',
+    overlayTitle:'Rita p\u00e5 kartan', overlaySubtitle:'V\u00e4lj ett verktyg f\u00f6r att b\u00f6rja',
+    overlayReady:'Omr\u00e5de klart', overlayAnalysing:'Analyserar\u2026',
+    analyzingTitle:'Analyserar\u2026', analyzingSub:'Bearbetar ritat omr\u00e5de',
+    detectedTitle:'Lupin detekterad', cleanTitle:'Ingen lupin detekterad',
+    simSub:'Inget SH-token \u2014 l\u00e4gg till token f\u00f6r riktiga Sentinel-2-data',
+    liveSub:'Sentinel-2 L2A-analys klar',
+    readyTitle:'Omr\u00e5de ritat', readySub:'Klicka \u201dAnalysera\u201d f\u00f6r att k\u00f6ra detektion',
+    noArea:'Rita ett omr\u00e5de p\u00e5 kartan f\u00f6rst.',
+  }
+};
+
+let currentLang = 'en';
+function t(k) { return STRINGS[currentLang][k] || k; }
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim().toLowerCase() === lang));
+  applyTranslations();
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-t]').forEach(el => {
+    const v = STRINGS[currentLang][el.getAttribute('data-t')];
+    if (v !== undefined) el.textContent = v;
+  });
+  if (!drawnLayer) {
+    document.getElementById('draw-hint').textContent      = t('hintIdle');
+    document.getElementById('result-title').textContent   = t('idleTitle');
+    document.getElementById('result-sub').textContent     = t('idleSub');
+    document.getElementById('overlay-title').textContent  = t('overlayTitle');
+    document.getElementById('overlay-coords').textContent = t('overlaySubtitle');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════
+let mapInstance   = null;
+let currentBaselayer     = 'osm';
+let currentAnalysisLayer = 'rgb';
+let osmTileLayer  = null;
+
+// Drawing
+let drawnLayer  = null;
+let activeTool  = null;       // 'polygon' | 'rect' | null
+let isDrawing   = false;
+let polyPoints  = [];
+let tempMarkers = [];
+let tempLines   = [];
+let previewLine = null;
+let rectStart   = null;
+let rectPreview = null;
+
+const TILE_URLS = {
+  osm:       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  streets:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+};
+
+function getShToken()     { return document.getElementById('sh-token').value.trim(); }
+
+// ════════════════════════════════════════════════════════════
+//  Map init
+// ════════════════════════════════════════════════════════════
+function initLeaflet() {
+  if (mapInstance) { try { mapInstance.remove(); } catch(e){} }
+  document.getElementById('map').innerHTML = '';
+  drawnLayer = null; clearTempDrawing();
+
+  const lmap = L.map('map', { center: [60.83, 14.97], zoom: 10, zoomControl: true });
+  osmTileLayer = L.tileLayer(TILE_URLS[currentBaselayer] || TILE_URLS.osm, {
+    attribution: currentBaselayer === 'satellite' ? 'Tiles \u00a9 Esri' : '\u00a9 OpenStreetMap',
+    maxZoom: 18
+  }).addTo(lmap);
+
+  lmap.on('click',     onMapClick);
+  lmap.on('dblclick',  onMapDblClick);
+  lmap.on('mousemove', onMapMouseMove);
+  lmap.on('mousedown', onRectMouseDown);
+  lmap.on('mouseup',   onRectMouseUp);
+
+  mapInstance = lmap;
+}
+
+function onShTokenChange() {
+  const val = document.getElementById('sh-token').value.trim();
+  const statusEl = document.getElementById('sh-token-status');
+
+  if (val.startsWith('eyJ') && val.length > 20) {
+    statusEl.textContent = '✓';
+    statusEl.style.color = '#3B6D11';
+  } else if (val.length > 0) {
+    statusEl.textContent = '?';
+    statusEl.style.color = '#D97706';
+  } else {
+    statusEl.textContent = '';
+  }
+
+  // Clear stale sim status and prompt re-run
+  const sub = document.getElementById('result-sub');
+  const btn = document.getElementById('btn-analyze');
+  if (sub && (sub.textContent.includes('No SH token') || sub.textContent.includes('sim'))) {
+    sub.textContent = t('readySub');
+  }
+  if (btn && !btn.disabled && val.startsWith('eyJ')) {
+    btn.style.background = '#185FA5';
+    btn.style.borderColor = '#185FA5';
+    btn.querySelector('span') && (btn.querySelector('span').textContent = '↻ Re-analyse with live data');
+    setTimeout(() => {
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.querySelector('span') && (btn.querySelector('span').textContent = t('btnAnalyze'));
+    }, 4000);
+  }
+  // Clear layer warning
+  const lbl = document.getElementById('img-date-label');
+  if (lbl && lbl.textContent.includes('token required')) {
+    lbl.style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  Baselayer
+// ════════════════════════════════════════════════════════════
+function setBaselayer(id) {
+  currentBaselayer = id;
+  ['osm','streets','satellite'].forEach(l =>
+    document.getElementById('bl-' + l).classList.toggle('active', l === id));
+
+  if (!mapInstance) return;
+
+  if (osmTileLayer) mapInstance.removeLayer(osmTileLayer);
+
+  const url = TILE_URLS[id] || TILE_URLS.osm;
+  const attr = id === 'satellite' ? 'Tiles \u00a9 Esri' : '\u00a9 OpenStreetMap';
+  osmTileLayer = L.tileLayer(url, { attribution: attr, maxZoom: 18 }).addTo(mapInstance);
+
+  if (drawnLayer) drawnLayer.bringToFront();
+}
+
+// ── Sentinel Hub evalscripts per layer ───────────────────────
+const LAYER_EVALSCRIPTS = {
+  rgb: `//VERSION=3
+function setup(){return{input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function evaluatePixel(s){
+  if(s.dataMask===0)return[0,0,0,0];
+  if(s.SCL===3||s.SCL===8||s.SCL===9||s.SCL===10||s.SCL===11)return[0,0,0,0];
+  return[Math.min(255,Math.round(3.5*s.B04*255)),Math.min(255,Math.round(3.5*s.B03*255)),Math.min(255,Math.round(3.5*s.B02*255)),255];
+}`,
+  nbgd: `//VERSION=3
+function setup(){return{input:[{bands:["B02","B03","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function evaluatePixel(s){
+  if(s.dataMask===0)return[0,0,0,0];
+  if(s.SCL===3||s.SCL===8||s.SCL===9||s.SCL===10||s.SCL===11)return[0,0,0,0];
+  var nb=(s.B02-s.B03)/(s.B02+s.B03+1e-9);
+  var v=Math.max(0,Math.min(1,(nb+0.15)/0.30));
+  return[Math.round(v*0.8*255),Math.round(v*0.2*255),Math.round((1-v*0.5)*255),255];
+}`,
+  ndvi: `//VERSION=3
+function setup(){return{input:[{bands:["B04","B08","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function evaluatePixel(s){
+  if(s.dataMask===0)return[0,0,0,0];
+  if(s.SCL===3||s.SCL===8||s.SCL===9||s.SCL===10||s.SCL===11)return[0,0,0,0];
+  var n=(s.B08-s.B04)/(s.B08+s.B04+1e-4);
+  var v=Math.max(0,Math.min(1,(n+1)/2));
+  return[Math.round((1-v)*255),Math.round(v*0.8*255),Math.round(0.2*255),255];
+}`,
+  lupin: `//VERSION=3
+var NBGD_THR=__NBGD__;
+function setup(){return{input:[{bands:["B02","B03","B04","B05","B08","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function evaluatePixel(s){
+  if(s.dataMask===0)return[0,0,0,0];
+  if(s.SCL===3||s.SCL===8||s.SCL===9||s.SCL===10||s.SCL===11)return[0,0,0,0];
+  var r=Math.min(255,Math.round(3.5*s.B04*255));
+  var g=Math.min(255,Math.round(3.5*s.B03*255));
+  var b=Math.min(255,Math.round(3.5*s.B02*255));
+  if(s.SCL!==4)return[r,g,b,255];
+  var ndvi=(s.B08-s.B04)/(s.B08+s.B04+1e-9);
+  var ndwi=(s.B03-s.B08)/(s.B03+s.B08+1e-9);
+  var nbgd=(s.B02-s.B03)/(s.B02+s.B03+1e-9);
+  var ari=(1/s.B03)-(1/s.B05);
+  if(s.B08<0.12||ndwi>-0.15)return[r,g,b,255];
+  if(ndvi<0.25||ndvi>0.65)return[r,g,b,255];
+  // Only mark as lupin when signal is clearly above threshold
+  // Use threshold slider value directly — no extra margin
+  if(nbgd>NBGD_THR&&ari>3.0&&s.B02>s.B04*0.85)return[255,0,255,255];
+  return[r,g,b,255];
+}`
+};
+
+let bestLupinDate = null;  // set after successful statistics call
+let sentinelOverlay = null;
+
+const LEGENDS = {
+  rgb: null,  // no legend for natural colour
+  nbgd: {
+    title: 'NBGD — Purple signal',
+    type: 'gradient',
+    gradient: 'linear-gradient(to right, #1a9850, #fee08b, #4575b4)',
+    low: 'Green (−0.15)', high: 'Blue/purple (+0.15)',
+    note: 'NBGD = (Blue − Green) / (Blue + Green). Positive = purple/blue tones'
+  },
+  ndvi: {
+    title: 'NDVI — Vegetation',
+    type: 'gradient',
+    gradient: 'linear-gradient(to right, #d73027, #fee08b, #1a9850)',
+    low: '−1 (bare/water)', high: '+1 (dense)',
+    note: 'Lupin filter: NDVI 0.1 – 0.7'
+  },
+  lupin: {
+    title: 'Lupin detection',
+    type: 'swatches',
+    rows: [
+      { color: '#ff00ff', label: 'Lupin (veg + purple + NDVI dip)' },
+      { color: '#4a8c5c', label: 'Other vegetation' },
+      { color: '#c8b89a', label: 'Bare soil / road / water' },
+    ]
+  }
+};
+
+function updateLegend(id) {
+  const el = document.getElementById('map-legend');
+  const def = LEGENDS[id];
+  if (!def) { el.style.display = 'none'; return; }
+
+  let html = `<div class="legend-title">${def.title}</div>`;
+
+  if (def.type === 'gradient') {
+    html += `<div class="legend-gradient" style="background:${def.gradient}"></div>`;
+    html += `<div class="legend-grad-labels"><span>${def.low}</span><span>${def.high}</span></div>`;
+    if (def.note) html += `<div style="font-size:10px;color:var(--color-text-tertiary);line-height:1.4">${def.note}</div>`;
+  } else if (def.type === 'swatches') {
+    def.rows.forEach(r => {
+      html += `<div class="legend-row">
+        <div class="legend-swatch" style="background:${r.color}"></div>
+        <span>${r.label}</span>
+      </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+function switchAnalysisLayer(id) {
+  currentAnalysisLayer = id;
+  ['rgb','nbgd','ndvi','lupin'].forEach(l =>
+    document.getElementById('al-' + l).classList.toggle('active', l === id));
+  updateLegend(id);
+
+  const shToken  = getShToken();
+  const preStart = document.getElementById('pre-start').value;
+  const peakEnd  = document.getElementById('peak-end').value;
+
+  if (sentinelOverlay) { mapInstance.removeLayer(sentinelOverlay); sentinelOverlay = null; }
+  document.getElementById('img-date-label').style.display = 'none';
+  if (id === 'rgb' && !shToken) return;
+  if (!shToken) {
+    const lbl = document.getElementById('img-date-label');
+    lbl.textContent = '⚠ Sentinel Hub token required — paste token in the sidebar to view ' + id.toUpperCase();
+    lbl.style.display = 'block';
+    lbl.style.color = '#D97706';
+    // Flash the token input to draw attention
+    const tokenInput = document.getElementById('sh-token');
+    tokenInput.style.borderColor = '#D97706';
+    tokenInput.style.boxShadow = '0 0 0 2px rgba(217,119,6,0.2)';
+    setTimeout(() => {
+      tokenInput.style.borderColor = '';
+      tokenInput.style.boxShadow = '';
+    }, 2000);
+    return;
+  }
+  document.getElementById('img-date-label').style.color = 'var(--color-text-secondary)';
+
+  const b      = drawnLayer ? drawnLayer.getBounds() : mapInstance.getBounds();
+  const bbox   = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+  const width  = 1024;
+  const height = Math.round(width * (b.getNorth() - b.getSouth()) / (b.getEast() - b.getWest()));
+
+  // Inject live thresholds into lupin evalscript
+  let script = LAYER_EVALSCRIPTS[id];
+  if (id === 'lupin') {
+    const dndviThr = parseFloat(document.getElementById('dndvi-thresh').value);
+    const nbgdThr  = parseFloat(document.getElementById('nbgd-thresh').value);
+    script = script
+      .replace('__DNDVI__', dndviThr.toFixed(3))
+      .replace('__NBGD__',  nbgdThr.toFixed(3));
+  }
+
+  // For lupin layer: use the best statistical window so map matches coverage number
+  // For RGB/NBGD/NDVI: use leastCC over full peak range for clearest view
+  const fromDate  = (id === 'lupin' && bestLupinDate) ? bestLupinDate.from : layerSplitDate;
+  const toDateStr = (id === 'lupin' && bestLupinDate) ? bestLupinDate.to   : peakEnd;
+  const maxCloud = (id === 'lupin' && bestLupinDate) ? 60 : 30;
+
+  // Use road buffer if available, else polygon
+  const geometry = roadBufferGeoJSON
+    ? roadBufferGeoJSON.geometry
+    : (() => {
+        let coords;
+        if (drawnLayer instanceof L.Polygon) {
+          const pts = drawnLayer.getLatLngs()[0].map(ll => [ll.lng, ll.lat]);
+          if (pts[0][0] !== pts[pts.length-1][0]) pts.push(pts[0]);
+          coords = [pts];
+        } else {
+          coords = [[
+            [b.getWest(),b.getSouth()],[b.getEast(),b.getSouth()],
+            [b.getEast(),b.getNorth()],[b.getWest(),b.getNorth()],
+            [b.getWest(),b.getSouth()]
+          ]];
+        }
+        return { type: 'Polygon', coordinates: coords };
+      })();
+
+  // Helper: check what fraction of pixels are transparent (missing/cloud)
+  function checkTransparency(blob) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, img.width, img.height).data;
+        let transparent = 0, total = img.width * img.height;
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] < 10) transparent++;
+        }
+        URL.revokeObjectURL(img.src);
+        resolve(transparent / total);
+      };
+      img.onerror = () => resolve(1);
+      img.src = URL.createObjectURL(blob);
+    });
+  }
+
+  // Mosaic strategy:
+  // - Lupin layer with bestLupinDate: use leastCC (time-consistent with statistics)
+  // - Everything else: use mostRecent (fills cloud gaps for better visual coverage)
+  const useLeastCC  = (id === 'lupin' && bestLupinDate);
+  const mosaicOrder = useLeastCC ? 'leastCC' : 'mostRecent';
+  const mosaicNote  = useLeastCC ? 'leastCC' : 'mostRecent mosaic';
+
+  function fetchLayerImage(from, to, cloudMax) {
+    return fetch('https://services.sentinel-hub.com/api/v1/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + shToken },
+      body: JSON.stringify({
+        input: {
+          bounds: { geometry, properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' } },
+          data: [{ type: 'sentinel-2-l2a', dataFilter: {
+            timeRange: { from: from+'T00:00:00Z', to: to+'T23:59:59Z' },
+            maxCloudCoverage: cloudMax,
+            mosaickingOrder: mosaicOrder
+          }}]
+        },
+        output: { width, height, responses: [{ identifier: 'default', format: { type: 'image/png' } }] },
+        evalscript: script
+      })
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => { throw new Error(JSON.stringify(e)); });
+      return r.blob();
+    });
+  }
+
+  // Strategy: try progressively wider time windows and higher cloud tolerance
+  const MIN_VALID   = 0.40;
+  const MAX_MISSING = 0.60;
+  const layerSplitDate = document.getElementById('split-date').value;
+  const layerPreStart  = document.getElementById('pre-start').value;
+
+  const imgPromise = (async () => {
+    // Attempt 1: peak window, leastCC, 30% cloud
+    let blob = await fetchLayerImage(fromDate, toDateStr, 30);
+    let missing = await checkTransparency(blob);
+    console.log(`Attempt 1 (${fromDate}→${toDateStr}, 30%): ${Math.round((1-missing)*100)}% valid`);
+    if (missing <= MAX_MISSING) return { blob, fallback: false, missing, attempt: 1 };
+
+    // Attempt 2: full peak range, 60% cloud
+    blob = await fetchLayerImage(layerSplitDate, peakEnd, 60);
+    missing = await checkTransparency(blob);
+    console.log(`Attempt 2 (${layerSplitDate}→${peakEnd}, 60%): ${Math.round((1-missing)*100)}% valid`);
+    if (missing <= MAX_MISSING) return { blob, fallback: true, missing, attempt: 2 };
+
+    // Attempt 3: full season (May–July), 80% cloud
+    const year = fromDate.slice(0,4);
+    blob = await fetchLayerImage(`${year}-05-01`, `${year}-07-31`, 80);
+    missing = await checkTransparency(blob);
+    console.log(`Attempt 3 (${year}-05-01→${year}-07-31, 80%): ${Math.round((1-missing)*100)}% valid`);
+    if (missing <= MAX_MISSING) return { blob, fallback: true, missing, attempt: 3 };
+
+    // Attempt 4: full year, any cloud
+    blob = await fetchLayerImage(`${year}-01-01`, `${year}-12-31`, 100);
+    missing = await checkTransparency(blob);
+    console.log(`Attempt 4 (full year, 100%): ${Math.round((1-missing)*100)}% valid`);
+    return { blob, fallback: true, missing, attempt: 4, tooCloudly: missing > 0.8 };
+  })();
+
+  const datePromise = fetch('https://services.sentinel-hub.com/api/v1/catalog/1.0.0/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + shToken },
+    body: JSON.stringify({
+      collections: ['sentinel-2-l2a'],
+      datetime: fromDate + 'T00:00:00Z/' + peakEnd + 'T23:59:59Z',
+      bbox: bbox,
+      limit: 10
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    const features = data?.features || [];
+    // Sort by cloud cover ascending, pick the clearest scene
+    features.sort((a, b) =>
+      (a?.properties?.['eo:cloud_cover'] ?? 100) - (b?.properties?.['eo:cloud_cover'] ?? 100)
+    );
+    console.log('Catalog scenes:', features.map(f => ({
+      date: f?.properties?.datetime?.slice(0, 10),
+      cloud: f?.properties?.['eo:cloud_cover']
+    })));
+    if (features.length > 0) {
+      return features[0]?.properties?.datetime?.slice(0, 10) || null;
+    }
+    return null;
+  })
+  .catch(e => { console.warn('Catalog error:', e); return null; });
+
+  Promise.all([imgPromise, datePromise])
+  .then(([result, sceneDate]) => {
+    const { blob, fallback, missing, tooCloudly, attempt } = result;
+
+    if (tooCloudly || !blob) {
+      const dateEl = document.getElementById('img-date-label');
+      dateEl.textContent = `⚠ No usable imagery found for ${fromDate.slice(0,4)} — try a different year`;
+      dateEl.style.display = 'block';
+      dateEl.style.color = '#D97706';
+      return;
+    }
+
+    const imgUrl = URL.createObjectURL(blob);
+    sentinelOverlay = L.imageOverlay(imgUrl,
+      [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]],
+      { opacity: 1.0, interactive: false }
+    ).addTo(mapInstance);
+    if (drawnLayer) drawnLayer.bringToFront();
+
+    const validPct = Math.round((1 - missing) * 100);
+    const dateEl   = document.getElementById('img-date-label');
+    dateEl.style.color = 'var(--color-text-secondary)';
+
+    const attemptLabels = {
+      1: `${fromDate} → ${toDateStr}`,
+      2: `${layerSplitDate} → ${peakEnd} (wider range)`,
+      3: `${fromDate.slice(0,4)}-05-01 → 07-31 (full season)`,
+      4: `${fromDate.slice(0,4)} full year`,
+    };
+    const rangeLabel = attemptLabels[attempt] || `${fromDate} → ${toDateStr}`;
+    const mosaicNote = 'mostRecent mosaic';
+
+    if (id === 'lupin' && bestLupinDate && attempt === 1) {
+      dateEl.textContent = `Best window: ${bestLupinDate.from} → ${bestLupinDate.to} · ${mosaicNote} (${validPct}% valid)`;
+    } else if (sceneDate && attempt === 1) {
+      dateEl.textContent = `Scene: ${sceneDate} · ${mosaicNote} (${validPct}% valid)`;
+    } else {
+      dateEl.textContent = `${rangeLabel} · ${mosaicNote} (${validPct}% valid)`;
+    }
+    dateEl.style.display = 'block';
+  })
+  .catch(e => console.error('Layer overlay error:', e));
+}
+
+// ════════════════════════════════════════════════════════════
+//  Draw tools
+// ════════════════════════════════════════════════════════════
+function activateTool(tool) {
+  if (activeTool === tool) { deactivateTools(); return; }
+  deactivateTools();
+  activeTool = tool;
+  isDrawing  = true;
+  document.getElementById('tool-' + tool).classList.add('active');
+  mapInstance.getContainer().style.cursor = 'crosshair';
+  document.getElementById('draw-hint').textContent =
+    tool === 'polygon' ? t('hintPolygon') : t('hintRect');
+  if (tool === 'rect') mapInstance.dragging.disable();
+}
+
+function deactivateTools() {
+  if (activeTool) document.getElementById('tool-' + activeTool).classList.remove('active');
+  activeTool = null; isDrawing = false;
+  if (mapInstance) { mapInstance.getContainer().style.cursor = ''; mapInstance.dragging.enable(); }
+  clearTempDrawing();
+}
+
+// ── Polygon ───────────────────────────────────────────────────
+function onMapClick(e) {
+  if (activeTool !== 'polygon' || !isDrawing) return;
+  if (e.originalEvent && e.originalEvent._isDouble) return;
+
+  polyPoints.push(e.latlng);
+  const m = L.circleMarker(e.latlng, {
+    radius: 4, color: '#2C2C2A', weight: 1.5, fillColor: '#fff', fillOpacity: 1
+  }).addTo(mapInstance);
+  tempMarkers.push(m);
+
+  if (polyPoints.length > 1) {
+    const line = L.polyline(
+      [polyPoints[polyPoints.length - 2], polyPoints[polyPoints.length - 1]],
+      { color: '#2C2C2A', weight: 1.5, dashArray: '4 3' }
+    ).addTo(mapInstance);
+    tempLines.push(line);
+  }
+}
+
+function onMapDblClick(e) {
+  if (activeTool !== 'polygon' || polyPoints.length < 3) return;
+  if (e.originalEvent) e.originalEvent._isDouble = true;
+  finishPolygon();
+}
+
+function onMapMouseMove(e) {
+  if (activeTool === 'polygon' && polyPoints.length > 0) {
+    if (previewLine) mapInstance.removeLayer(previewLine);
+    previewLine = L.polyline(
+      [polyPoints[polyPoints.length - 1], e.latlng],
+      { color: '#2C2C2A', weight: 1, dashArray: '3 4', opacity: 0.5 }
+    ).addTo(mapInstance);
+  }
+  if (activeTool === 'rect' && rectStart) {
+    if (rectPreview) mapInstance.removeLayer(rectPreview);
+    rectPreview = L.rectangle(L.latLngBounds(rectStart, e.latlng), {
+      color: '#2C2C2A', weight: 1.5, dashArray: '4 3', fillColor: '#639922', fillOpacity: 0.1
+    }).addTo(mapInstance);
+  }
+}
+
+function finishPolygon() {
+  if (polyPoints.length < 3) return;
+  const pts = [...polyPoints];
+  clearTempDrawing(); deactivateTools();
+  drawnLayer = L.polygon(pts, {
+    color: '#2C2C2A', weight: 2, fillColor: '#639922', fillOpacity: 0.06
+  }).addTo(mapInstance);
+  mapInstance.fitBounds(drawnLayer.getBounds(), { padding: [30, 30] });
+  onAreaDrawn();
+}
+
+// ── Rectangle ─────────────────────────────────────────────────
+function onRectMouseDown(e) {
+  if (activeTool !== 'rect') return;
+  rectStart = e.latlng;
+}
+
+function onRectMouseUp(e) {
+  if (activeTool !== 'rect' || !rectStart) return;
+  const bounds = L.latLngBounds(rectStart, e.latlng);
+  if (rectPreview) { mapInstance.removeLayer(rectPreview); rectPreview = null; }
+  const sizeLat = Math.abs(bounds.getNorth() - bounds.getSouth());
+  const sizeLng = Math.abs(bounds.getEast()  - bounds.getWest());
+  if (sizeLat < 0.001 || sizeLng < 0.001) { rectStart = null; return; }
+  deactivateTools();
+  drawnLayer = L.rectangle(bounds, {
+    color: '#2C2C2A', weight: 2, fillColor: '#639922', fillOpacity: 0.06
+  }).addTo(mapInstance);
+  mapInstance.fitBounds(drawnLayer.getBounds(), { padding: [30, 30] });
+  onAreaDrawn();
+  rectStart = null;
+}
+
+function onAreaDrawn() {
+  const area   = computeAreaKm2(drawnLayer);
+  const nPts   = drawnLayer instanceof L.Polygon ? drawnLayer.getLatLngs()[0].length : 4;
+  const center = drawnLayer.getBounds().getCenter();
+
+  const ha = (area * 100).toFixed(1);
+  document.getElementById('polygon-info').style.display  = 'block';
+  document.getElementById('area-val').textContent         = area.toFixed(2) + ' km² (' + ha + ' ha)';
+  document.getElementById('draw-hint').textContent        = t('hintDone');
+  document.getElementById('btn-analyze').disabled         = false;
+  document.getElementById('result-title').textContent     = t('readyTitle');
+  document.getElementById('result-sub').textContent       = t('readySub');
+  document.getElementById('status-icon').className = 'status-icon idle';
+  document.getElementById('status-icon').textContent      = '→';
+  document.getElementById('coverage-block').style.display = 'none';
+  document.getElementById('overlay-title').textContent    = t('overlayReady');
+  document.getElementById('overlay-coords').textContent   = center.lat.toFixed(4) + ', ' + center.lng.toFixed(4);
+}
+
+function clearTempDrawing() {
+  polyPoints = [];
+  tempMarkers.forEach(m => mapInstance && mapInstance.removeLayer(m)); tempMarkers = [];
+  tempLines.forEach(l => mapInstance && mapInstance.removeLayer(l));   tempLines   = [];
+  if (previewLine && mapInstance) { mapInstance.removeLayer(previewLine); previewLine = null; }
+  if (rectPreview && mapInstance) { mapInstance.removeLayer(rectPreview); rectPreview = null; }
+  rectStart = null;
+}
+
+function clearDrawing() {
+  deactivateTools();
+  if (drawnLayer && mapInstance) { mapInstance.removeLayer(drawnLayer); drawnLayer = null; }
+  if (sentinelOverlay && mapInstance) { mapInstance.removeLayer(sentinelOverlay); sentinelOverlay = null; }
+  if (roadBufferLayer && mapInstance) { mapInstance.removeLayer(roadBufferLayer); roadBufferLayer = null; }
+  roadBufferGeoJSON = null;
+  bestLupinDate = null;
+  document.getElementById('map-legend').style.display = 'none';
+  document.getElementById('img-date-label').style.display = 'none';
+  document.getElementById('polygon-info').style.display   = 'none';
+  document.getElementById('draw-hint').textContent        = t('hintIdle');
+  document.getElementById('btn-analyze').disabled         = true;
+  document.getElementById('coverage-block').style.display = 'none';
+  document.getElementById('status-icon').className = 'status-icon idle';
+  document.getElementById('status-icon').textContent      = '?';
+  document.getElementById('result-title').textContent     = t('idleTitle');
+  document.getElementById('result-sub').textContent       = t('idleSub');
+  document.getElementById('overlay-title').textContent    = t('overlayTitle');
+  document.getElementById('overlay-coords').textContent   = t('overlaySubtitle');
+}
+
+function resetAll() { clearDrawing(); }
+
+// ════════════════════════════════════════════════════════════
+//  Area (spherical shoelace)
+// ════════════════════════════════════════════════════════════
+function computeAreaKm2(layer) {
+  const lls = layer instanceof L.Polygon ? layer.getLatLngs()[0] : [
+    layer.getBounds().getNorthWest(), layer.getBounds().getNorthEast(),
+    layer.getBounds().getSouthEast(), layer.getBounds().getSouthWest(),
+  ];
+  const R = 6371, rad = d => d * Math.PI / 180;
+  let area = 0, n = lls.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += (rad(lls[j].lng) - rad(lls[i].lng)) *
+            (2 + Math.sin(rad(lls[i].lat)) + Math.sin(rad(lls[j].lat)));
+  }
+  return Math.abs(area * R * R / 2);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Analysis
+// ════════════════════════════════════════════════════════════
+function getBbox(layer) {
+  const b = layer.getBounds();
+  return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+}
+
+function simulateAnalysis(layer) {
+  const c = layer.getBounds().getCenter();
+  const h = Math.abs(Math.sin(c.lat * 127.1 + c.lng * 311.7));
+  return { isDetected: h > 0.45, coverage: h > 0.45 ? Math.round(10 + h * 55) : Math.round(h * 8) };
+}
+
+// Auto-calculate resolution so output stays within SH's 2500x2500 px limit
+// SH hard limit: 1500 m/px for S2L2A statistics
+function calcResolution(layer) {
+  const b      = layer.getBounds();
+  const latDeg = Math.abs(b.getNorth() - b.getSouth());
+  const lngDeg = Math.abs(b.getEast()  - b.getWest());
+  const longest = Math.max(latDeg, lngDeg);
+  // Target 256 px on longest side, but never finer than ~20m (≈0.00018°) or coarser than ~1500m (≈0.0135°)
+  const resDeg = longest / 256;
+  const clamped = Math.min(0.0135, Math.max(0.00018, resDeg));
+  // Convert back to approximate meters for display only
+  const resM = Math.round(clamped * 111320);
+  return { deg: parseFloat(clamped.toFixed(6)), m: resM };
+}
+
+// ════════════════════════════════════════════════════════════
+//  Random Forest lupin classifier
+//  Trained on 202 samples (101 lupin + 101 background)
+//  2022–2025 GBIF observations, spatially stratified across Sweden
+//  CV F1 = 0.97, Recall = 0.97
+// ════════════════════════════════════════════════════════════
+function rfPredictLupin(f) {
+  f = Object.assign({
+    pre_ndvi:0,peak_ndvi:0,dndvi:0,peak_nbgd:0,
+    peak_ari:0,peak_evi:0,peak_ndwi:0,
+    peak_b02:0,peak_b04:0,peak_b08:0,
+  }, f);
+  const prob = ((f['peak_b02']<=0.05135?(f['peak_ndwi']<=-0.58579?0.5000:0.0000):(f['peak_b02']<=0.05522?(f['peak_b08']<=0.27011?0.7500:1.0000):(f['peak_evi']<=0.49531?(f['peak_ari']<=6.69096?(f['peak_ndwi']<=-0.56433?(f['peak_ndvi']<=0.59914?(f['peak_ari']<=5.96746?0.0000:(f['peak_ndvi']<=0.58887?0.0000:0.5000)):0.8333):(f['pre_ndvi']<=0.57151?0.1667:(f['peak_b08']<=0.35081?(f['peak_ari']<=4.95861?0.2667:0.6857):0.0000))):(f['peak_b04']<=0.07688?(f['pre_ndvi']<=0.60652?1.0000:(f['peak_evi']<=0.43125?0.6000:0.0000)):0.0000)):(f['peak_ndvi']<=0.59595?(f['peak_evi']<=0.53082?0.0000:0.5000):(f['peak_ari']<=7.09183?(f['peak_ari']<=5.90596?0.8333:1.0000):0.6667)))))+(f['peak_nbgd']<=-0.02963?(f['peak_b04']<=0.09141?(f['peak_b08']<=0.29361?(f['peak_evi']<=0.44148?(f['peak_nbgd']<=-0.16281?(f['peak_b04']<=0.06580?0.5714:1.0000):(f['peak_b08']<=0.29103?(f['peak_ndwi']<=-0.56857?(f['dndvi']<=-0.01077?0.2000:0.0000):(f['peak_nbgd']<=-0.07030?0.4348:1.0000)):1.0000)):(f['peak_ndwi']<=-0.50727?0.0000:0.3333)):(f['peak_ndwi']<=-0.56348?(f['peak_ndvi']<=0.59027?(f['peak_ndwi']<=-0.56401?(f['peak_b08']<=0.32275?0.1250:0.0000):1.0000):(f['peak_evi']<=0.42146?0.2500:(f['peak_b02']<=0.06010?1.0000:0.3333))):(f['peak_ari']<=7.37221?(f['pre_ndvi']<=0.61125?(f['peak_evi']<=0.43088?(f['peak_nbgd']<=-0.15969?0.0000:1.0000):(f['peak_b04']<=0.08580?0.4000:0.0000)):(f['dndvi']<=-0.00171?0.0000:0.2000)):0.7500))):(f['peak_ndwi']<=-0.50403?(f['peak_b04']<=0.09744?1.0000:(f['peak_b04']<=0.10125?0.6000:0.9091)):(f['peak_ndvi']<=0.59656?0.0000:0.6667))):(f['peak_b02']<=0.09299?1.0000:0.5000))+(f['peak_b04']<=0.06230?0.0000:(f['peak_b08']<=0.36944?(f['pre_ndvi']<=0.57980?(f['peak_nbgd']<=-0.13229?0.6667:0.0000):(f['peak_b04']<=0.09001?(f['peak_b04']<=0.07435?(f['peak_ndwi']<=-0.58519?0.2500:(f['dndvi']<=-0.01281?(f['peak_ari']<=6.01145?0.8333:1.0000):(f['peak_nbgd']<=-0.11065?0.8421:0.3636))):(f['dndvi']<=-0.00187?(f['peak_ari']<=5.82338?(f['peak_b04']<=0.07903?0.1000:0.5758):(f['peak_ari']<=6.38364?0.0476:0.2500)):(f['peak_b04']<=0.07932?1.0000:(f['peak_nbgd']<=-0.05683?0.3750:0.7500)))):(f['dndvi']<=-0.02828?1.0000:(f['dndvi']<=-0.01267?0.3333:(f['peak_nbgd']<=-0.17003?0.4000:1.0000))))):(f['peak_ndwi']<=-0.53123?0.2000:0.0000)))+(f['pre_ndvi']<=0.60291?(f['peak_evi']<=0.39954?1.0000:(f['dndvi']<=-0.01380?(f['peak_ndwi']<=-0.53847?0.0000:0.2500):(f['peak_evi']<=0.41251?0.0000:(f['dndvi']<=0.01667?(f['peak_ari']<=5.74511?(f['peak_b08']<=0.31135?0.1250:0.7500):(f['peak_ndvi']<=0.57996?0.7500:1.0000)):1.0000)))):(f['peak_nbgd']<=-0.15762?(f['peak_nbgd']<=-0.17655?(f['peak_b04']<=0.08234?0.8000:(f['peak_evi']<=0.43750?0.1667:0.7500)):(f['peak_ari']<=5.27248?0.5000:(f['pre_ndvi']<=0.63628?0.0000:0.2500))):(f['peak_b04']<=0.06809?1.0000:(f['peak_b02']<=0.06842?(f['peak_nbgd']<=-0.15195?(f['peak_b08']<=0.30359?1.0000:0.6667):(f['peak_b04']<=0.07304?(f['peak_b04']<=0.07017?(f['peak_evi']<=0.42125?0.0000:0.2500):(f['peak_b08']<=0.28449?1.0000:0.0000)):0.0000)):(f['peak_ari']<=6.81734?(f['peak_nbgd']<=-0.08613?(f['peak_ndwi']<=-0.53829?(f['dndvi']<=-0.01645?0.7500:1.0000):0.6000):(f['peak_evi']<=0.47679?(f['peak_b04']<=0.08041?0.4000:0.0000):(f['peak_ndvi']<=0.61228?1.0000:0.4000))):0.0000))))))/20;
+  return prob > 0.5;
+}
+
+function detectLupin(features, nbgdThr, dndviThr) {
+  // Use trained RF model
+  if (features.peak_nbgd != null && features.peak_ndvi != null) {
+    return rfPredictLupin(features);
+  }
+  return false;
+}
+// ════════════════════════════════════════════════════════════
+
+// Road buffer width in meters — lupin grows within ~15m of road edge
+const ROAD_BUFFER_M = 30;
+
+// Road type IDs to include (NVDB väghållare):
+// 1=European, 2=National, 3=Regional, 6=Municipal collector
+// We skip private roads (7) and forest roads (9)
+const NVDB_ROAD_TYPES = [1, 2, 3, 6];
+
+let roadBufferLayer   = null;  // Leaflet layer showing buffer on map
+let roadBufferGeoJSON = null;  // GeoJSON polygon used for SH geometry
+
+async function fetchNVDBRoads(bbox) {
+  // bbox = [west, south, east, north]
+  const [west, south, east, north] = bbox;
+
+  // NVDB API v3 — road network (vägnät) within bbox
+  // Returns GeoJSON FeatureCollection of LineStrings
+  const url = `https://nvdbapiv3.trafikverket.se/api/v4/v%C3%A4gn%C3%A4t` +
+    `?bbox=${west},${south},${east},${north}` +
+    `&v%C3%A4gtyp=${NVDB_ROAD_TYPES.join(',')}` +
+    `&geometri=true` +
+    `&srid=4326`;
+
+  console.log('Fetching NVDB roads:', url);
+
+  let resp;
+  try {
+    resp = await fetch(url, {
+      headers: { 'Accept': 'application/json, application/vnd.geo+json' }
+    });
+  } catch(e) {
+    console.warn('NVDB fetch failed:', e.message);
+    return null;
+  }
+
+  if (!resp.ok) {
+    console.warn('NVDB API error:', resp.status);
+    return null;
+  }
+
+  const data = await resp.json();
+  console.log('NVDB features:', data?.features?.length ?? data?.length ?? 'unknown');
+  return data;
+}
+
+async function buildRoadBuffer(bbox) {
+  const roads = await fetchNVDBRoads(bbox);
+  if (!roads) return null;
+
+  // Normalise to FeatureCollection
+  let fc = roads;
+  if (!fc.type) {
+    fc = { type: 'FeatureCollection', features: Array.isArray(roads) ? roads : [roads] };
+  }
+  if (fc.features.length === 0) {
+    console.warn('No roads found in bbox');
+    return null;
+  }
+
+  // Buffer each road line by ROAD_BUFFER_M metres, then union all buffers
+  const buffered = fc.features
+    .filter(f => f.geometry)
+    .map(f => turf.buffer(f, ROAD_BUFFER_M / 1000, { units: 'kilometers', steps: 4 }))
+    .filter(Boolean);
+
+  if (buffered.length === 0) return null;
+
+  // Union all buffers into a single polygon
+  let union = buffered[0];
+  for (let i = 1; i < buffered.length; i++) {
+    try { union = turf.union(union, buffered[i]); } catch(e) {}
+  }
+
+  // Clip to original polygon boundary
+  if (drawnLayer) {
+    const drawn = drawnLayer instanceof L.Polygon
+      ? turf.polygon([drawnLayer.getLatLngs()[0].map(ll => [ll.lng, ll.lat])])
+      : turf.bboxPolygon(bbox);
+    try { union = turf.intersect(union, drawn); } catch(e) {}
+  }
+
+  return union;
+}
+
+function showRoadBuffer(geojson) {
+  if (roadBufferLayer) mapInstance.removeLayer(roadBufferLayer);
+  if (!geojson) return;
+  roadBufferLayer = L.geoJSON(geojson, {
+    style: {
+      color: '#E87D14',
+      weight: 1,
+      fillColor: '#E87D14',
+      fillOpacity: 0.12,
+      dashArray: '3 3'
+    }
+  }).addTo(mapInstance);
+  roadBufferLayer.bringToFront();
+  if (drawnLayer) drawnLayer.bringToFront();
+}
+
+function runAnalysis() {
+  if (!drawnLayer) { alert(t('noArea')); return; }
+  const btn     = document.getElementById('btn-analyze');
+  const loading = document.getElementById('loading');
+  btn.disabled = true; loading.style.display = 'block';
+  document.getElementById('result-title').textContent  = t('analyzingTitle');
+  document.getElementById('result-sub').textContent    = 'Fetching NVDB roads…';
+  document.getElementById('coverage-block').style.display = 'none';
+  document.getElementById('overlay-title').textContent = t('overlayAnalysing');
+
+  const shToken = getShToken();
+  const bbox    = getBbox(drawnLayer);
+
+  if (!shToken) {
+    btn.disabled = false; loading.style.display = 'none';
+    const s = simulateAnalysis(drawnLayer); displayResult(s.isDetected, s.coverage, true);
+    return;
+  }
+
+  // Step 1: fetch NVDB roads → build buffer → Step 2: run SH analysis
+  buildRoadBuffer(bbox)
+    .then(bufferGeom => {
+      roadBufferGeoJSON = bufferGeom;
+      showRoadBuffer(bufferGeom);
+      if (!bufferGeom) {
+        console.warn('No road buffer — running analysis on full polygon');
+        document.getElementById('result-sub').textContent = 'No NVDB roads found — using full area';
+      } else {
+        const roadKm = (turf.area(bufferGeom) / 1e6).toFixed(2);
+        console.log(`Road buffer area: ${roadKm} km²`);
+        document.getElementById('result-sub').textContent = `Road buffer: ${roadKm} km²`;
+      }
+      document.getElementById('result-sub').textContent = t('analyzingSub');
+      btn.disabled = false; loading.style.display = 'none';
+      callSentinelHub();
+    })
+    .catch(e => {
+      console.error('NVDB error:', e);
+      roadBufferGeoJSON = null;
+      btn.disabled = false; loading.style.display = 'none';
+      callSentinelHub();  // fall back to full polygon
+    });
+}
+
+function callSentinelHub() {
+  const shToken   = getShToken();
+  const preStart  = document.getElementById('pre-start').value;
+  const splitDate = document.getElementById('split-date').value;
+  const peakEnd   = document.getElementById('peak-end').value;
+  const dndviThr  = parseFloat(document.getElementById('dndvi-thresh').value);
+  const nbgdThr   = parseFloat(document.getElementById('nbgd-thresh').value);
+  const bbox      = getBbox(drawnLayer);
+  const res       = calcResolution(drawnLayer);
+
+  console.log('bbox:', bbox, 'resolution:', res.m + 'm/px', 'split:', splitDate);
+
+  // Statistics API uses SIMPLE mosaicking (ORBIT not supported).
+  // Strategy: run two stat calls — pre-bloom NDVI mean + peak-bloom NDVI+NBGD mean,
+  // then compute ΔNDVI client-side and apply thresholds to produce coverage estimate.
+
+  // Evalscript for pre-bloom: output mean NDVI, water-masked
+  const preEval = `//VERSION=3
+function setup(){return{input:[{bands:["B03","B04","B08","SCL","dataMask"]}],output:[{id:"default",bands:1,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
+function evaluatePixel(s){
+  if(s.dataMask===0||s.SCL!==4)return{default:[0],dataMask:[0]};
+  var ndvi=(s.B08-s.B04)/(s.B08+s.B04+1e-9);
+  var ndwi=(s.B03-s.B08)/(s.B03+s.B08+1e-9);
+  if(s.B08<0.12||ndwi>-0.15||ndvi<0.20||ndvi>0.70)return{default:[0],dataMask:[0]};
+  return{default:[ndvi],dataMask:[1]};
+}`;
+
+  // Peak evalscript:
+  // B0 = lupin binary flag (1 if pixel meets all criteria, 0 otherwise)
+  //      mean(B0) = true pixel coverage fraction (e.g. 0.08 = 8% of vegetation pixels)
+  // B1 = raw NBGD value (for RF model features)
+  // B2-B7 = other features
+  const peakEval = `//VERSION=3
+function setup(){return{input:[{bands:["B02","B03","B04","B05","B08","SCL","dataMask"]}],
+  output:[{id:"default",bands:8,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
+function evaluatePixel(s){
+  if(s.dataMask===0||s.SCL!==4)return{default:[0,0,0,0,0,0,0,0],dataMask:[0]};
+  var ndvi=(s.B08-s.B04)/(s.B08+s.B04+1e-9);
+  var ndwi=(s.B03-s.B08)/(s.B03+s.B08+1e-9);
+  if(s.B08<0.12||ndwi>-0.15||ndvi<0.20||ndvi>0.70)return{default:[0,0,0,0,0,0,0,0],dataMask:[0]};
+  var nbgd=(s.B02-s.B03)/(s.B02+s.B03+1e-9);
+  var ari=(1/s.B03)-(1/s.B05);
+  var evi=2.5*(s.B08-s.B04)/(s.B08+6*s.B04-7.5*s.B02+1+1e-9);
+  // B0: binary lupin flag based on NBGD + ARI (used for coverage calculation)
+  // This threshold is baked in at -0.15 — same as slider default
+  // mean(B0) across pixels = actual lupin coverage fraction
+  var lupinFlag=(nbgd>-0.15&&ari>3.0&&s.B02>s.B04*0.85)?1:0;
+  // B0=flag, B1=NBGD, B2=ARI, B3=EVI, B4=NDWI, B5=B02, B6=B04, B7=B08
+  return{default:[lupinFlag,nbgd,ari,evi,ndwi,s.B02,s.B04,s.B08],dataMask:[1]};
+}`;
+
+  // Use road buffer if available, otherwise fall back to full drawn polygon
+  const analysisGeometry = roadBufferGeoJSON
+    ? roadBufferGeoJSON.geometry
+    : (drawnLayer instanceof L.Polygon
+        ? { type: 'Polygon', coordinates: [(() => {
+              const pts = drawnLayer.getLatLngs()[0].map(ll => [ll.lng, ll.lat]);
+              if (pts[0][0] !== pts[pts.length-1][0]) pts.push(pts[0]);
+              return pts;
+            })()] }
+        : { type: 'Polygon', coordinates: [[
+              [bbox[0],bbox[1]],[bbox[2],bbox[1]],
+              [bbox[2],bbox[3]],[bbox[0],bbox[3]],[bbox[0],bbox[1]]
+            ]] });
+
+  console.log('Using geometry:', roadBufferGeoJSON ? 'NVDB road buffer' : 'full polygon');
+
+  const shBody = (fromDate, toDate, script) => ({
+    input: {
+      bounds: { geometry: analysisGeometry, properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' } },
+      data: [{ type: 'sentinel-2-l2a', dataFilter: {
+        timeRange: { from: fromDate+'T00:00:00Z', to: toDate+'T23:59:59Z' },
+        maxCloudCoverage: 30
+      }}]
+    },
+    aggregation: {
+      timeRange: { from: fromDate+'T00:00:00Z', to: toDate+'T23:59:59Z' },
+      aggregationInterval: { of: 'P5D' },  // 5-day intervals to capture individual scenes
+      evalscript: script,
+      resx: res.deg, resy: res.deg
+    }
+  });
+
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + shToken };
+
+  // Helper: extract best value across all intervals
+  // Use max (not mean) — lupin covers small % of area, mean gets diluted
+  const getBestInterval = (data, band) => {
+    const intervals = data?.data || [];
+    const values = intervals
+      .map(d => {
+        const s = d?.outputs?.default?.bands?.[band]?.stats;
+        // Prefer max over mean to capture small lupin patches
+        return s?.max ?? s?.mean;
+      })
+      .filter(v => v != null && v !== 0);
+    if (values.length === 0) return null;
+    return Math.max(...values);
+  };
+
+  // Run both calls in parallel
+  Promise.all([
+    fetch('https://services.sentinel-hub.com/api/v1/statistics', {
+      method: 'POST', headers, body: JSON.stringify(shBody(preStart, splitDate, preEval))
+    }).then(r => r.json()),
+    fetch('https://services.sentinel-hub.com/api/v1/statistics', {
+      method: 'POST', headers, body: JSON.stringify(shBody(splitDate, peakEnd, peakEval))
+    }).then(r => r.json())
+  ])
+  .then(([preData, peakData]) => {
+    console.log('Pre-bloom intervals:', preData?.data?.length);
+    console.log('Peak-bloom intervals:', peakData?.data?.length);
+
+    // Pre: best (max) NDVI across intervals
+    const preNDVI = getBestInterval(preData, 'B0');
+
+    // Peak: for each interval, check if NBGD max exceeds threshold
+    // Coverage = max fraction of pixels above NBGD threshold across any interval
+    const peakIntervals = peakData?.data || [];
+    let bestNBGD = null;
+    let bestCoverage = 0;
+    let bestIntervalFrom = null;
+    let bestIntervalTo   = null;
+
+    for (const interval of peakIntervals) {
+      const stats = interval?.outputs?.default?.bands?.B1?.stats;
+      if (!stats || stats.sampleCount === 0) continue;
+      // Use max to capture lupin pixels even when they're a small fraction
+      const val = stats.max ?? stats.mean;
+      if (val == null) continue;
+      if (bestNBGD === null || val > bestNBGD) {
+        bestNBGD = val;
+        bestIntervalFrom = interval?.interval?.from?.slice(0, 10);
+        bestIntervalTo   = interval?.interval?.to?.slice(0, 10);
+      }
+      // Coverage estimate based on mean and stDev
+      const mean  = stats.mean ?? 0;
+      const stDev = stats.stDev || 0.01;
+      const z = (mean - nbgdThr) / (stDev * 1.414 + 1e-9);
+      const erf_approx = z / (1 + 0.278393*Math.abs(z) + 0.230389*z*z + 0.000972*z*z*z + 0.078108*z*z*z*z);
+      const fraction = Math.max(0, Math.min(1, 0.5 * (1 + erf_approx)));
+      const cov = Math.round(fraction * 100);
+      if (cov > bestCoverage) bestCoverage = cov;
+    }
+
+    const peakNBGD = bestNBGD;
+
+    if (preNDVI == null || peakNBGD == null) {
+      console.warn('Missing stats — pre:', preNDVI, 'nbgd:', peakNBGD);
+      const s = simulateAnalysis(drawnLayer); displayResult(s.isDetected, s.coverage, true);
+      return;
+    }
+
+    // B0 = lupin binary flag → mean = actual pixel coverage fraction
+    // B1 = NBGD, B2 = ARI, B3 = EVI, B4 = NDWI, B5 = B02, B6 = B04, B7 = B08
+    const getBestBand = (band) => {
+      const vals = (peakIntervals)
+        .map(d => d?.outputs?.default?.bands?.[band]?.stats)
+        .filter(s => s && s.sampleCount > 0);
+      if (!vals.length) return null;
+      // For binary flag (B0): use max mean across intervals
+      // For other features: use max value
+      const means = vals.map(s => s.mean).filter(v => v != null);
+      return means.length ? Math.max(...means) : null;
+    };
+
+    // Coverage = best interval's mean of binary flag × 100
+    // This is the true fraction of vegetation pixels that are lupin
+    const coverageIntervals = peakIntervals
+      .map(d => ({
+        mean: d?.outputs?.default?.bands?.B0?.stats?.mean,
+        count: d?.outputs?.default?.bands?.B0?.stats?.sampleCount,
+        from: d?.interval?.from?.slice(0,10),
+        to:   d?.interval?.to?.slice(0,10),
+      }))
+      .filter(d => d.mean != null && d.count > 0);
+
+    // Best coverage = interval with highest lupin fraction
+    const bestCovInterval = coverageIntervals.reduce(
+      (best, d) => d.mean > (best?.mean ?? -1) ? d : best, null
+    );
+    const coverage = bestCovInterval
+      ? Math.round(bestCovInterval.mean * 100)
+      : 0;
+
+    // Also get pixel count for actual area estimate
+    const lupinPixels   = bestCovInterval ? Math.round(bestCovInterval.mean * (bestCovInterval.count || 0)) : 0;
+    const pixelAreaM2   = res.deg * 111320 * res.deg * 111320;  // approx m² per pixel
+    const lupinAreaHa   = (lupinPixels * pixelAreaM2 / 10000).toFixed(1);
+
+    const features = {
+      pre_ndvi:  preNDVI,
+      peak_ndvi: getBestBand('B1') ?? getBestBand('B0'),  // fallback
+      peak_nbgd: getBestBand('B1'),
+      peak_ari:  getBestBand('B2'),
+      peak_evi:  getBestBand('B3'),
+      peak_ndwi: getBestBand('B4'),
+      peak_b02:  getBestBand('B5'),
+      peak_b04:  getBestBand('B6'),
+      peak_b08:  getBestBand('B7'),
+    };
+    features.dndvi = (features.peak_ndvi != null) ? features.peak_ndvi - preNDVI : null;
+
+    console.log('RF features:', JSON.stringify(
+      Object.fromEntries(Object.entries(features).map(([k,v]) => [k, v?.toFixed(4)])), null, 2
+    ));
+    console.log(`Coverage: ${coverage}% (${lupinPixels} pixels ≈ ${lupinAreaHa} ha)`);
+
+    const isLupinRF = detectLupin(features, nbgdThr, dndviThr);
+    const isLupin   = isLupinRF || coverage > 0;
+
+    console.log(`isLupinRF=${isLupinRF} coverage=${coverage}% → isLupin=${isLupin}`);
+
+    // Save best date so lupin layer uses this exact window
+    if (bestIntervalFrom) {
+      bestLupinDate = { from: bestIntervalFrom, to: bestIntervalTo };
+      console.log('Best lupin window:', bestLupinDate);
+    }
+
+    displayResult(isLupin, coverage, false);
+    // Show area estimate in coverage label
+    if (lupinAreaHa > 0) {
+      document.getElementById('coverage-pct').textContent = `${coverage}% (~${lupinAreaHa} ha)`;
+    }
+
+    // Auto-show lupin layer using best window — user sees the evidence immediately
+    if (isLupin && bestLupinDate) {
+      setTimeout(() => switchAnalysisLayer('lupin'), 500);
+    }
+  })
+  .catch(e => {
+    console.error('SH error:', e);
+    const s = simulateAnalysis(drawnLayer); displayResult(s.isDetected, s.coverage, true);
+  });
+}
+
+function displayResult(isDetected, coverage, isSimulated) {
+  const icon = document.getElementById('status-icon');
+  icon.className = 'status-icon ' + (isDetected ? 'detected' : 'clean');
+  icon.textContent = isDetected ? '!' : '✓';
+  document.getElementById('result-title').textContent = isDetected ? t('detectedTitle') : t('cleanTitle');
+  document.getElementById('result-sub').textContent   = isSimulated ? t('simSub') : t('liveSub');
+  const cb = document.getElementById('coverage-block');
+  cb.style.display = 'block';
+  const fill = document.getElementById('coverage-fill');
+  fill.className   = 'coverage-fill ' + (coverage > 15 ? 'high' : 'low');
+  fill.style.width = Math.min(coverage, 100) + '%';
+  document.getElementById('coverage-pct').textContent = coverage + '%';
+  if (drawnLayer) drawnLayer.setStyle({ fillColor: isDetected ? '#D85A30' : '#639922', fillOpacity: 0.10 });
+  document.getElementById('overlay-title').textContent  = isDetected ? t('detectedTitle') : t('cleanTitle');
+  document.getElementById('overlay-coords').textContent = (isSimulated ? '(sim) ' : '') + coverage + '%';
+}
+
+// ════════════════════════════════════════════════════════════
+//  Boot
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  GBIF reference layer — known lupin observations
+// ════════════════════════════════════════════════════════════
+let gbifLayer      = null;
+let gbifEnabled    = false;
+let gbifAllResults  = [];
+
+// ════════════════════════════════════════════════════════════
+//  GBIF year filter — multi-select, per-year colors
+// ════════════════════════════════════════════════════════════
+// Each year gets a distinct color for easy visual comparison
+const GBIF_YEAR_COLORS = {
+  2019: '#8B5E3C', 2020: '#6B7280', 2021: '#0ea5e9',
+  2022: '#8b5cf6', 2023: '#10b981', 2024: '#f59e0b', 2025: '#ef4444'
+};
+
+let gbifSelectedYears = new Set(); // empty = show all
+
+function initGBIFYearFilter() {
+  const wrap = document.getElementById('gbif-year-btns');
+  const years = [2019,2020,2021,2022,2023,2024,2025];
+  years.forEach(y => {
+    const color = GBIF_YEAR_COLORS[y] || '#888';
+    const b = document.createElement('button');
+    b.className = 'gbif-yr-btn';
+    b.textContent = y;
+    b.dataset.year = y;
+    b.style.setProperty('--yr-color', color);
+    b.onclick = () => {
+      if (gbifSelectedYears.has(y)) {
+        gbifSelectedYears.delete(y);
+        b.style.background = '';
+        b.style.color = '';
+        b.style.borderColor = '';
+      } else {
+        gbifSelectedYears.add(y);
+        b.style.background = color;
+        b.style.color = '#fff';
+        b.style.borderColor = color;
+      }
+      renderGBIFMarkers();
+    };
+    wrap.appendChild(b);
+  });
+
+  // "All" button to clear selection
+  const allBtn = document.createElement('button');
+  allBtn.className = 'gbif-yr-btn';
+  allBtn.textContent = 'All';
+  allBtn.style.cssText = 'font-style:italic';
+  allBtn.onclick = () => {
+    gbifSelectedYears.clear();
+    wrap.querySelectorAll('.gbif-yr-btn[data-year]').forEach(b => {
+      b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
+    });
+    renderGBIFMarkers();
+  };
+  wrap.appendChild(allBtn);
+}
+
+function renderGBIFMarkers() {
+  if (gbifLayer) { mapInstance.removeLayer(gbifLayer); gbifLayer = null; }
+
+  const results = gbifSelectedYears.size > 0
+    ? gbifAllResults.filter(r => gbifSelectedYears.has(r.year))
+    : gbifAllResults;
+
+  const markers = results
+    .filter(r => r.decimalLatitude && r.decimalLongitude)
+    .map(r => {
+      const year = r.year || null;
+      const date = r.eventDate?.slice(0,10) || (year ? String(year) : 'unknown');
+      const src  = r.datasetName || r.institutionCode || 'GBIF';
+      const basisLabel = {
+        'HUMAN_OBSERVATION':'Field observation',
+        'PRESERVED_SPECIMEN':'Herbarium specimen',
+        'MACHINE_OBSERVATION':'Machine observation',
+      }[r.basisOfRecord] || r.basisOfRecord || '—';
+
+      const bg = (year && GBIF_YEAR_COLORS[year]) ? GBIF_YEAR_COLORS[year] : '#888';
+
+      const m = L.circleMarker([r.decimalLatitude, r.decimalLongitude], {
+        radius: 5, color: bg, weight: 1.5,
+        fillColor: bg, fillOpacity: 0.85
+      });
+      m.bindPopup(`<b>Lupinus polyphyllus</b><br>Year: <b>${year||'unknown'}</b><br>Date: ${date}<br>Type: ${basisLabel}<br>Source: ${src}`);
+      return m;
+    });
+
+  gbifLayer = L.layerGroup(markers).addTo(mapInstance);
+  if (drawnLayer) drawnLayer.bringToFront();
+
+  const selLabel = gbifSelectedYears.size > 0
+    ? ' · ' + [...gbifSelectedYears].sort().join(', ')
+    : '';
+  document.getElementById('bl-gbif').textContent = `GBIF (${markers.length}${selLabel})`;
+
+  // Update legend to show selected years with their colors
+  let legendEl = document.getElementById('gbif-legend');
+  if (!legendEl) {
+    legendEl = document.createElement('div');
+    legendEl.id = 'gbif-legend';
+    legendEl.style.cssText = 'position:absolute;bottom:70px;left:10px;z-index:1001;background:var(--color-bg);border:0.5px solid var(--color-border);border-radius:var(--radius-md);padding:6px 10px;font-size:10px;color:var(--color-text-secondary);pointer-events:none';
+    document.getElementById('map-container').appendChild(legendEl);
+  }
+  const shownYears = gbifSelectedYears.size > 0
+    ? [...gbifSelectedYears].sort()
+    : Object.keys(GBIF_YEAR_COLORS).map(Number);
+  legendEl.innerHTML = `
+    <div style="font-weight:500;color:var(--color-text);margin-bottom:5px">GBIF · Lupinus polyphyllus</div>
+    ${shownYears.map(y => `
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+        <span style="background:${GBIF_YEAR_COLORS[y]||'#888'};color:#fff;font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px">${y}</span>
+        <span style="color:var(--color-text-secondary)">${results.filter(r=>r.year===y).length} obs.</span>
+      </div>`).join('')}
+  `;
+}
+
+async function toggleGBIF() {
+  gbifEnabled = !gbifEnabled;
+  document.getElementById('bl-gbif').classList.toggle('active', gbifEnabled);
+  document.getElementById('gbif-year-filter').style.display = gbifEnabled ? 'block' : 'none';
+
+  if (!gbifEnabled) {
+    if (gbifLayer) { mapInstance.removeLayer(gbifLayer); gbifLayer = null; }
+    document.getElementById('bl-gbif').textContent = 'GBIF';
+    gbifSelectedYears.clear();
+    gbifAllResults = [];
+    document.querySelectorAll('.gbif-yr-btn[data-year]').forEach(b => {
+      b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
+    });
+    const legendEl = document.getElementById('gbif-legend');
+    if (legendEl) legendEl.remove();
+    return;
+  }
+
+  const bounds = mapInstance.getBounds();
+  const baseUrl = `https://api.gbif.org/v1/occurrence/search?taxonKey=2964355` +
+    `&decimalLatitude=${bounds.getSouth()},${bounds.getNorth()}` +
+    `&decimalLongitude=${bounds.getWest()},${bounds.getEast()}` +
+    `&hasCoordinate=true&hasGeospatialIssue=false&country=SE&limit=300`;
+
+  document.getElementById('bl-gbif').textContent = 'GBIF…';
+
+  try {
+    const first = await fetch(baseUrl + '&offset=0').then(r => r.json());
+    const total = first?.count || 0;
+    let results = first?.results || [];
+
+    if (total > 300 && total <= 3000) {
+      const pages = [];
+      for (let offset = 300; offset < total; offset += 300)
+        pages.push(fetch(baseUrl + `&offset=${offset}`).then(r => r.json()));
+      const rest = await Promise.all(pages);
+      rest.forEach(page => { results = results.concat(page?.results || []); });
+    }
+
+    gbifAllResults = results;
+    console.log(`GBIF: loaded ${results.length} of ${total} records`);
+
+    // Default filter to current analysis year if not already set
+    if (gbifSelectedYears.size === 0) {
+      const analysisYear = parseInt(document.getElementById('pre-start').value.slice(0,4));
+      gbifSelectedYears.add(analysisYear);
+      document.querySelectorAll('.gbif-yr-btn[data-year]').forEach(btn => {
+        const by = parseInt(btn.dataset.year);
+        const color = GBIF_YEAR_COLORS[by] || '#888';
+        const active = by === analysisYear;
+        btn.style.background  = active ? color : '';
+        btn.style.color       = active ? '#fff' : '';
+        btn.style.borderColor = active ? color : '';
+      });
+    }
+
+    renderGBIFMarkers();
+
+    // Legend
+    let legendEl = document.getElementById('gbif-legend');
+    if (!legendEl) {
+      legendEl = document.createElement('div');
+      legendEl.id = 'gbif-legend';
+      legendEl.style.cssText = 'position:absolute;bottom:70px;left:10px;z-index:1001;background:var(--color-bg);border:0.5px solid var(--color-border);border-radius:var(--radius-md);padding:6px 10px;font-size:10px;color:var(--color-text-secondary);pointer-events:none';
+      document.getElementById('map-container').appendChild(legendEl);
+    }
+    legendEl.innerHTML = `
+      <div style="font-weight:500;color:var(--color-text);margin-bottom:4px">GBIF · Lupinus polyphyllus</div>
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="background:#e6a817;color:#fff;font-size:9px;font-weight:600;padding:1px 3px;border-radius:3px">2024</span>≤ 3 years</div>
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="background:#d47a00;color:#fff;font-size:9px;font-weight:600;padding:1px 3px;border-radius:3px">2018</span>4–10 years</div>
+      <div style="display:flex;align-items:center;gap:5px"><span style="background:#8B5E3C;color:#fff;font-size:9px;font-weight:600;padding:1px 3px;border-radius:3px">2010</span>Older / unknown</div>
+    `;
+
+  } catch(e) {
+    console.error('GBIF error:', e);
+    gbifEnabled = false;
+    document.getElementById('bl-gbif').classList.remove('active');
+    document.getElementById('bl-gbif').textContent = 'GBIF';
+  }
+}
+
+
+// Reload GBIF when map is panned/zoomed
+function onMapMoveEnd() {
+  if (gbifEnabled) {
+    gbifAllResults = [];
+    document.getElementById('bl-gbif').textContent = 'GBIF';
+    toggleGBIF();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  applyTranslations();
+
+  // ── Year picker ──────────────────────────────────────────
+  const YEARS = [2019,2020,2021,2022,2023,2024,2025];
+  let activeYear = 2024;
+  const wrap = document.getElementById('year-btns-main');
+  YEARS.forEach(y => {
+    const b = document.createElement('button');
+    b.className = 'year-btn-main' + (y === activeYear ? ' active' : '');
+    b.textContent = y;
+    b.onclick = () => {
+      activeYear = y;
+      wrap.querySelectorAll('.year-btn-main').forEach(btn =>
+        btn.classList.toggle('active', parseInt(btn.textContent) === y));
+      document.getElementById('pre-start').value  = `${y}-05-01`;
+      document.getElementById('split-date').value = `${y}-06-15`;
+      document.getElementById('peak-start').value = `${y}-06-15`;
+      document.getElementById('peak-end').value   = `${y}-07-15`;
+      // Auto-sync GBIF year filter to match analysis year
+      if (gbifEnabled) {
+        gbifSelectedYears = new Set([y]);
+        document.querySelectorAll('.gbif-yr-btn[data-year]').forEach(btn => {
+          const by = parseInt(btn.dataset.year);
+          const color = GBIF_YEAR_COLORS[by] || '#888';
+          const active = by === y;
+          btn.style.background  = active ? color : '';
+          btn.style.color       = active ? '#fff' : '';
+          btn.style.borderColor = active ? color : '';
+        });
+        renderGBIFMarkers();
+      }
+    };
+    wrap.appendChild(b);
+  });
+  initGBIFYearFilter();
+  initLeaflet();
+  mapInstance.on('moveend', onMapMoveEnd);
+  // Stop Leaflet from intercepting clicks on the overlay UI panels
+  ['map-overlay','baselayer-switcher','layer-switcher','map-legend','img-date-label','gbif-year-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+    }
+  });
+});
+</script>
+
+
+</body></html>
